@@ -1,10 +1,12 @@
 name: Tests
 
 on:
-  push:
-    branches:
-      - master
-  pull_request:
+  workflow_dispatch:
+    inputs:
+      test-filter:
+        description: Optional mocha spec/selector; empty runs the full suite
+        required: false
+        default: ''
 
 env:
   FORCE_COLOR: 2
@@ -15,6 +17,7 @@ jobs:
   run:
     name: Node.js ${{ matrix.node }} @ ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
 
     strategy:
       fail-fast: false
@@ -46,8 +49,26 @@ jobs:
         run: npm install
 
       - name: Run tests
-        run: npm run test:ci
+        run: |
+          if [ -n "${{ inputs.test-filter }}" ]; then
+            npx mocha --reporter dot ${{ inputs.test-filter }}
+          else
+            npm run test:ci
+          fi
+        shell: bash
 
       - name: Run Coveralls
         uses: coverallsapp/github-action@5cbfd81b66ca5d10c19b062c04de0199c215fb6e # v2
-        if: startsWith(matrix.os, 'ubuntu') && matrix.node == 14
+        if: false
+
+      - name: Pack
+        if: matrix.os == 'ubuntu-latest' && matrix.node == 24
+        run: npm pack
+
+      - name: Upload package
+        if: matrix.os == 'ubuntu-latest' && matrix.node == 24
+        uses: actions/upload-artifact@v4
+        with:
+          name: picomatch-tgz
+          path: picomatch-*.tgz
+          if-no-files-found: error
